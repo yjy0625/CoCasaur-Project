@@ -3,7 +3,7 @@ var controls;
 var spheres = [];
 
 var rows = 20;
-var cols = 30;
+var cols = 35;
 var pad = 3;
 var minX = -cols * pad;
 var maxX = cols * pad;
@@ -30,9 +30,9 @@ function createScene() {
 	const FAR = 10000;
 
 	scene = new THREE.Scene();
+	scene.background = new THREE.Color( 0x000000 );
 
 	renderer = new THREE.WebGLRenderer( { alpha: true } );
-	renderer.setClearColor( 0x000000, 0 );
 	renderer.setSize(WIDTH, HEIGHT);
 
 	camera = new THREE.PerspectiveCamera(
@@ -47,13 +47,13 @@ function createScene() {
 	container.appendChild(renderer.domElement);
 
 	var parameters = {};
-	parameters.z = -300;
+	parameters.z = -200;
 
 	// ADD A BOX
 
 	for(var x = minX; x <= maxX; x += pad) {
 		for(var y = minY; y <= maxY; y+= pad) {
-			var sphere = addSphere(1, {x: x, y: y, z: -270}, 0xffffff);
+			var sphere = addSphere(1, {x: x, y: y, z: -270}, 0xff0000);
 			spheres.push(sphere);
 		}
 	}
@@ -92,7 +92,6 @@ function createScene() {
 }
 
 function render() {
-	renderer.setClearColor( 0x000000, 0 );
 	renderer.render(scene, camera);
 }
 
@@ -127,7 +126,7 @@ function addBox(sidelength, position, color) {
 function addSphere(radius, position, color) {
 	const SEGMENTS = 16;
 	const RINGS = 16;
-	var material = new THREE.MeshBasicMaterial( {color: color, transparent: true, opacity: 0.0} );
+	var material = new THREE.MeshBasicMaterial( {color: color, transparent: true, opacity: 0.5} );
 	var sphere = new THREE.Mesh( 
 		new THREE.SphereGeometry( radius, SEGMENTS, RINGS ), 
 		material 
@@ -139,13 +138,13 @@ function addSphere(radius, position, color) {
 	return sphere;
 }
 
-function setCubeColor(index, opacity) {
+function setSphereColor(index, opacity) {
 	spheres[index].material.opacity = opacity;
 }
 
 function detectHand() {
 	var smoother = new Smoother([0.9995, 0.9995], [0, 0], 0),
-		canvas = document.getElementById('canvas'),
+		canvas = document.getElementById('video'),
 		context = canvas.getContext('2d'),
 		video = document.createElement('video'),
 		detector;
@@ -184,7 +183,7 @@ function detectHand() {
           	if (!detector) {
 	      		var width = ~~(140 * video.videoWidth / video.videoHeight);
 				var height = 140;
-	      		detector = new objectdetect.detector(width, height, 1.1, objectdetect.handopen);
+	      		detector = new objectdetect.detector(width, height, 1.1, objectdetect.handfist);
 	      	}
       		
       		// Smooth rotation of the 3D object:
@@ -194,36 +193,69 @@ function detectHand() {
 			var coords = detector.detect(video, 1);
 			
 			if (coords[0]) {
-				var coord = coords[0];
+				// [startx, starty, width, height]
+				var coord = coords[0].slice(0);
+				// [startx, starty, endx, endy]
+				var displayCoord = coord.slice(0);
 				
 				// Rescale coordinates from detector to video coordinate space:
-				var drawWidth = cols * 2;
-				var drawHeight = rows * 2;
+				var drawWidth = canvas.width;
+				var drawHeight = canvas.height;
 				coord[0] *= drawWidth / detector.canvas.width;
 				coord[1] *= drawHeight / detector.canvas.height;
 				coord[2] *= drawWidth / detector.canvas.width;
 				coord[3] *= drawHeight / detector.canvas.height;
+				
+				// Rescale coordinates from detector to three.js drawing coordinate space:
+				var displayDrawWidth = cols * 2 * pad;
+				var displayDrawHeight = rows * 2 * pad;
+				displayCoord[0] = Math.floor(coord[0] * displayDrawWidth / detector.canvas.width - displayDrawWidth / 2);
+				displayCoord[1] = Math.floor(coord[1] * displayDrawHeight / detector.canvas.height - displayDrawHeight / 2);
+				displayCoord[2] = Math.ceil((coord[0] + coord[2]) * displayDrawWidth / detector.canvas.width - displayDrawWidth / 2);
+				displayCoord[3] = Math.ceil((coord[1] + coord[3]) * displayDrawHeight / detector.canvas.height - displayDrawHeight / 2);
 
-				document.getElementById("log").innerHTML = video.videoWidth + " " + video.videoHeight;
+				// log canvas sizes
+				document.getElementById("log").innerHTML = "Original: " + detector.canvas.width + " " + detector.canvas.height;
+				document.getElementById("log").innerHTML += "<br/>Video: " + drawWidth + " " + drawHeight;
+				document.getElementById("log").innerHTML += "<br/>Display: " + displayDrawWidth + " " + displayDrawHeight;
 
-				var index = 0;
-				for(var x = minX; x <= maxX; x += pad) {
-					for(var y = maxY; y >= minY; y -= pad) {
-						if(inRange(x - minX, coord[0], coord[2]) && inRange(y - minY, coord[1], coord[3])) {
-							setCubeColor(index, 1.0);
+				// draw on three.js if recognition is stable
+				if (fist_pos_old) {
+					var index = 0;
+					for(var x = maxX; x >= minX; x -= pad) {
+						for(var y = maxY; y >= minY; y -= pad) {
+							if(inRange(x, displayCoord[0], displayCoord[2]) && inRange(y, displayCoord[1], displayCoord[3])) {
+								setSphereColor(index, 1.0);
+							}
+							else {
+								setSphereColor(index, 0.5);
+							}
+							index++;	
 						}
-						else {
-							setCubeColor(index, 0.0);
-						}
-						index++;	
 					}
 				}
+				
+				// log coordinate positions
 				var log = document.getElementById("log").innerHTML;
-				log += "<br/>" + coord[0].toFixed(2) + " " + coord[1].toFixed(2) + " " + coord[2].toFixed(2) + " " + coord[3].toFixed(2);
+				log += "<br/>Original Coords: " 
+					+ coords[0][0].toFixed(2) + " " 
+					+ coords[0][1].toFixed(2) + " " 
+					+ coords[0][2].toFixed(2) + " " 
+					+ coords[0][3].toFixed(2);
+				log += "<br/>Video Coords: " 
+					+ coord[0].toFixed(2) + " " 
+					+ coord[1].toFixed(2) + " " 
+					+ coord[2].toFixed(2) + " " 
+					+ coord[3].toFixed(2);
+				log += "<br/>Display Coords: [ " 
+					+ displayCoord[0] + " ~ " + displayCoord[2] 
+					+ " , " 
+					+ displayCoord[1] + " ~ " + displayCoord[3]
+					+ " ]";
 				document.getElementById("log").innerHTML = log;
 				
+				// keep a record of fist position
 				var fist_pos = [coord[0] + coord[2] / 2, coord[1] + coord[3] / 2];
-				
 				if (fist_pos_old) {
 					var dx = (fist_pos[0] - fist_pos_old[0]) / video.videoWidth,
 						dy = (fist_pos[1] - fist_pos_old[1]) / video.videoHeight;
@@ -241,11 +273,7 @@ function detectHand() {
 				context.beginPath();
 				context.lineWidth = '2';
 				context.fillStyle = fist_pos_old ? 'rgba(0, 255, 255, 0.5)' : 'rgba(255, 0, 0, 0.5)';
-				context.fillRect(
-					coord[0] / video.videoWidth * canvas.clientWidth,
-					coord[1] / video.videoHeight * canvas.clientHeight,
-					coord[2] / video.videoWidth * canvas.clientWidth,
-					coord[3] / video.videoHeight * canvas.clientHeight);
+				context.fillRect(coord[0], coord[1], coord[2], coord[3]);
 				context.stroke();
 			} else fist_pos_old = null;
 		}
