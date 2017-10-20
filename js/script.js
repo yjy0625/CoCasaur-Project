@@ -3,8 +3,8 @@ var controls;
 var spheres = [];
 
 var rows = 20;
-var cols = 35;
-var pad = 3;
+var cols = 30;
+var pad = 2;
 var minX = -cols * pad;
 var maxX = cols * pad;
 var minY = -rows * pad;
@@ -124,8 +124,8 @@ function addBox(sidelength, position, color) {
 }
 
 function addSphere(radius, position, color) {
-	const SEGMENTS = 16;
-	const RINGS = 16;
+	const SEGMENTS = 5;
+	const RINGS = 5;
 	var material = new THREE.MeshBasicMaterial( {color: color, transparent: true, opacity: 0.5} );
 	var sphere = new THREE.Mesh( 
 		new THREE.SphereGeometry( radius, SEGMENTS, RINGS ), 
@@ -215,24 +215,14 @@ function detectHand() {
 				displayCoord[3] = Math.ceil((coord[1] + coord[3]) * displayDrawHeight / detector.canvas.height - displayDrawHeight / 2);
 
 				// log canvas sizes
-				document.getElementById("log").innerHTML = "Original: " + detector.canvas.width + " " + detector.canvas.height;
+				document.getElementById("log").innerHTML  = "Min & max of x & y: " + minX + "," + maxX + "," + minY + "," + maxY;
+				document.getElementById("log").innerHTML += "<br/>Original: " + detector.canvas.width + " " + detector.canvas.height;
 				document.getElementById("log").innerHTML += "<br/>Video: " + drawWidth + " " + drawHeight;
 				document.getElementById("log").innerHTML += "<br/>Display: " + displayDrawWidth + " " + displayDrawHeight;
 
 				// draw on three.js if recognition is stable
 				if (fist_pos_old) {
-					var index = 0;
-					for(var x = maxX; x >= minX; x -= pad) {
-						for(var y = maxY; y >= minY; y -= pad) {
-							if(inRange(x, displayCoord[0], displayCoord[2]) && inRange(y, displayCoord[1], displayCoord[3])) {
-								setSphereColor(index, 1.0);
-							}
-							else {
-								setSphereColor(index, 0.5);
-							}
-							index++;	
-						}
-					}
+					drawRect(displayCoord);
 				}
 				
 				// log coordinate positions
@@ -282,4 +272,20 @@ function detectHand() {
 
 function inRange(num, low, high) {
 	return (num >= low) && (num <= high);
+}
+
+function drawRect(coords) {
+	var draw = coords.length >= 4;
+	index = 0;
+	for(var x = maxX; x >= minX; x -= pad) {
+		for(var y = maxY; y >= minY; y -= pad) {
+			if(draw && inRange(x, coords[0], coords[2]) && inRange(y, coords[1], coords[3])) {
+				setSphereColor(index, 1.0);
+			}
+			else {
+				setSphereColor(index, 0.5);
+			}
+			index++;	
+		}
+	}
 }
