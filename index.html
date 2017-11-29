@@ -1,26 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+	<title>three.js - gpu particle system</title>
 	<meta charset="utf-8">
-	<title>ThreeJS Example</title>
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 	<link type="text/css" rel="stylesheet" href="css/styles.css" />
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<script src="js/three.min.js"></script>
-	<script src="js/dat.gui.min.js"></script>
-	<script src="js/OrbitControls.js"></script>
-
-	<script src="js/compatibility.js"></script>
-	<script src="js/smoother.js"></script>
 	
-	<script src="js/objectdetect.js"></script>
-	<script src="js/objectdetect.handfist.js"></script>
-
-	<script src="js/script.js"></script>
+	<style>
+	
+	</style>
 </head>
-<body onload="init();" onresize="onWindowResize();">
+
+<body onload="load();">
+
 	<div class="background"></div>
 	<div id="container"></div>
-	<canvas id="video" css="display: none"></canvas>
-	<div id="log" style="opacity: 0"></div>
+	<canvas id="video"></canvas>
+	<div id="info">
+		CoCasaur Group Project
+	</div>
+
+	<script src="script.js"></script>
+	<script src="./js/three.min.js"></script>
+	<script src="./js/TrackballControls.js"></script>
+	<script src="./js/dat.gui.min.js"></script>
+	<script src="./js/stats.min.js"></script>
+	<script src="./js/GPUParticleSystem.js"></script>
+	<script src="./js/compatibility.js"></script>
+	<script src="./js/smoother.js"></script>
+	<script src="./js/objectdetect.js"></script>
+	<script src="./js/objectdetect.handfist.js"></script>
 </body>
+
 </html>
