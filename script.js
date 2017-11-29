@@ -1,4 +1,4 @@
-var PRINT_CAM = true;
+var PRINT_CAM = false;
 var SHOW_GUI = false;
 var SHOW_STATS = false;
 
@@ -226,8 +226,7 @@ function load() {
 
 	function detectHand() {
 
-		var smoother = new Smoother([0.9995, 0.9995], [0, 0], 0),
-			canvas = document.getElementById('video'),
+		var canvas = document.getElementById('video'),
 			context = canvas.getContext('2d'),
 			video = document.createElement('video'),
 			detector;
@@ -249,7 +248,7 @@ function load() {
 			alert(error);
 		}
 
-		var fist_pos_old, angle = [0, 0];
+		var fist_pos_old;
 		
 		function play() {
 			compatibility.requestAnimationFrame(play);
@@ -258,9 +257,7 @@ function load() {
 	        // Draw video overlay:
 			canvas.width = ~~(100 * video.videoWidth / video.videoHeight);
 			canvas.height = 100;
-			if(PRINT_CAM) {
-				context.drawImage(video, 0, 0, canvas.clientWidth, canvas.clientHeight);
-			}
+			context.drawImage(video, 0, 0, canvas.clientWidth, canvas.clientHeight);
 			
 			if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
 			
@@ -270,9 +267,6 @@ function load() {
 					var height = 140;
 		      		detector = new objectdetect.detector(width, height, 1.1, objectdetect.handfist);
 		      	}
-	      		
-	      		// Smooth rotation of the 3D object:
-				angle = smoother.smooth(angle);
 
 	      		// Perform the actual detection:
 				var coords = detector.detect(video, 1);
@@ -318,10 +312,6 @@ function load() {
 						var dx = (fist_pos[0] - fist_pos_old[0]) / video.videoWidth,
 							dy = (fist_pos[1] - fist_pos_old[1]) / video.videoHeight;
 						
-						if (dx*dx + dy*dy < 0.2) {
-							angle[0] += 5.0 * dx;
-							angle[1] += 5.0 * dy;
-						}
 						fist_pos_old = fist_pos;
 					} else if (coord[4] > 2) {
 						fist_pos_old = fist_pos;
@@ -351,7 +341,7 @@ function load() {
 		var draw = coords.length >= 4;
 		var isControlling = (controllingParticleSystem != null);
 		var state = (isControlling? 1: 0) * 2 + (draw? 1: 0);
-		console.log("State: " + state + "; center: [" + center.x + "," + center.y + "]; System size: " + particleSystems.length);
+		// console.log("State: " + state + "; center: [" + center.x + "," + center.y + "]; System size: " + particleSystems.length);
 
 		// ASCII State Diagram
 		//
