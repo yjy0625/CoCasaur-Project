@@ -249,7 +249,7 @@ function load() {
 						drawInRect(displayCoord);
 					}
 					else {
-						drawInRect([1000,1000,1000,1000]);
+						drawInRect([]);
 					}
 					
 					// keep a record of fist position
@@ -290,7 +290,7 @@ function load() {
 		var draw = coords.length >= 4;
 		var isControlling = (controllingParticleSystem != null);
 		var state = (isControlling? 1: 0) * 2 + (draw? 1: 0);
-		console.log("Draw: " + (draw? 1: 0));
+		console.log("State: " + state + "; center: [" + center.x + "," + center.y + "]");
 
 		// ASCII State Diagram
 		//
@@ -311,11 +311,11 @@ function load() {
 			controllingParticleSystem = newParticleSystem;
 			break;
 		case 2: // x draw, √ control
-			newParticleSystem.options.speed = getDistance(
-				newParticleSystem.options.previousPosition,
-				newParticleSystem.options.position
+			controllingParticleSystem.options.speed = getDistance(
+				controllingParticleSystem.options.previousPosition,
+				controllingParticleSystem.options.position
 			);
-			particleSystems.push(newParticleSystem);
+			particleSystems.push(controllingParticleSystem);
 			controllingParticleSystem = null;
 			break;
 		case 3: // √ draw, √ control
