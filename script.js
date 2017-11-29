@@ -1,14 +1,20 @@
 var PRINT_CAM = true;
+var SHOW_GUI = false;
+var SHOW_STATS = false;
 
 function load() {
 	var camera, tick = 0,
 		scene, renderer, clock = new THREE.Clock(),
-		controls, container, gui = new dat.GUI( { width: 350 } ),
+		controls, container,
 		options, spawnerOptions;
+
+	var gui = null;
+	if(SHOW_GUI) {
+		gui = new dat.GUI( { width: 350 } );
+	}
 
 	var particleSystems = [];
 	var controllingParticleSystem = null;
-	const speedMultiplier = 1.0;
 
 	var stats;
 
@@ -26,7 +32,6 @@ function load() {
 		camera.position.z = 100;
 
 		scene = new THREE.Scene();
-		scene.background = new THREE.Color( 0x000000 );
 
 		// options passed during each spawned
 
@@ -35,16 +40,16 @@ function load() {
 			positionRandomness: .3,
 			velocity: new THREE.Vector3(),
 			velocityRandomness: .5,
-			color: 0xaa88ff,
+			color: 0xffffff,
 			colorRandomness: .2,
 			turbulence: .5,
-			lifetime: 2,
+			lifetime: 10,
 			size: 5,
 			sizeRandomness: 1
 		};
 
 		spawnerOptions = {
-			spawnRate: 15000,
+			spawnRate: 20000,
 			horizontalSpeed: 1.5,
 			verticalSpeed: 1.33,
 			timeScale: 1
@@ -52,28 +57,31 @@ function load() {
 
 		//
 
-		gui.add( options, "velocityRandomness", 0, 3 );
-		gui.add( options, "positionRandomness", 0, 3 );
-		gui.add( options, "size", 1, 20 );
-		gui.add( options, "sizeRandomness", 0, 25 );
-		gui.add( options, "colorRandomness", 0, 1 );
-		gui.add( options, "lifetime", .1, 10 );
-		gui.add( options, "turbulence", 0, 1 );
+		if(SHOW_GUI) {
+			gui.add( options, "velocityRandomness", 0, 3 );
+			gui.add( options, "positionRandomness", 0, 3 );
+			gui.add( options, "size", 1, 20 );
+			gui.add( options, "sizeRandomness", 0, 25 );
+			gui.add( options, "colorRandomness", 0, 1 );
+			gui.add( options, "lifetime", .1, 10 );
+			gui.add( options, "turbulence", 0, 1 );
 
-		gui.add( spawnerOptions, "spawnRate", 10, 30000 );
-		gui.add( spawnerOptions, "timeScale", -1, 1 );
+			gui.add( spawnerOptions, "spawnRate", 10, 30000 );
+			gui.add( spawnerOptions, "timeScale", -1, 1 );
+		}
 
 		//
 
-		stats = new Stats();
-		container.appendChild( stats.dom );
+		if(SHOW_STATS) {
+			stats = new Stats();
+			container.appendChild( stats.dom );
+		}
 
 		//
 
 		renderer = new THREE.WebGLRenderer();
 		renderer.setPixelRatio( window.devicePixelRatio );
 		renderer.setSize( window.innerWidth, window.innerHeight );
-		renderer.setClearColor( 0x000000, 0 );
 		container.appendChild( renderer.domElement );
 
 		//
@@ -86,6 +94,9 @@ function load() {
 
 		window.addEventListener( 'resize', onWindowResize, false );
 
+		if(!PRINT_CAM) {
+			document.getElementById("video").style.display = "none";
+		}
 	}
 
 	function onWindowResize() {
@@ -99,28 +110,49 @@ function load() {
 
 	function animate() {
 
+		window.requestAnimationFrame(animate);
+
 		for(var i = 0; i < particleSystems.length; i++) {
 			var ps = particleSystems[i];
-			var psSpeed = ps.options.speed;
-			ps.options.position.x += psSpeed.x * speedMultiplier;
-			ps.options.position.y += psSpeed.y * speedMultiplier;
-			updateParticleSystem(particleSystem);
+			ps.spawnerOptions.spawnRate -= 1000;
+
+			updateParticleSystem(ps);
+
+			// delete the particle system if its lifetime ends
+			if(ps.spawnerOptions.spawnRate < -270000) {
+				scene.remove(ps);
+				particleSystems.splice(i, 1);
+				i--;
+			}
 		}
 
 		if(controllingParticleSystem != null) {
 			updateParticleSystem(controllingParticleSystem);
 		}
 
+		render();
+
+		if(SHOW_STATS) {
+			stats.update();
+		}
+
 	}
 
 	function createParticleSystem() {
+
+		controls.update();
 
 		var particleSystem = new THREE.GPUParticleSystem( {
 			maxParticles: 250000
 		} );
 
 		particleSystem.options = clone(options);
-		particleSystem.options.speed = {x: 0.0, y: 0.0};
+		particleSystem.options.speed = {x: 0.0, y: 0.0, z: 0.0};
+		particleSystem.options.tick = 0;
+		particleSystem.options.clock = new THREE.Clock();
+		particleSystem.options.color = hslToHex(Math.random(), 1, 0.5);
+
+		particleSystem.spawnerOptions = clone(spawnerOptions);
 
 		scene.add( particleSystem );
 
@@ -130,19 +162,51 @@ function load() {
 
 	function updateParticleSystem(particleSystem) {
 
-		requestAnimationFrame( animate );
+		var delta = particleSystem.options.clock.getDelta() * particleSystem.spawnerOptions.timeScale;
 
-		controls.update();
+		particleSystem.options.tick += delta;
+		var tick = particleSystem.options.tick;
 
-		var delta = clock.getDelta() * spawnerOptions.timeScale;
+		if ( tick < 0 ) {
+			particleSystem.options.tick = 0;
+			tick = 0;
+		}
 
-		tick += delta;
+		// get location offset
+		var targetPosition = particleSystem.options.targetPosition;
+		var position = particleSystem.options.position;
+		if(targetPosition != null) {
+			var cameraOffset = getVector(position, targetPosition);
+			var cameraMagnitude = getMagnitude(cameraOffset);
 
-		if ( tick < 0 ) tick = 0;
+			const maxCameraSpeed = 20.0;
+			const maxDisplaySpeed = 1.0;
+
+			var displaySpeed = maxDisplaySpeed;
+			if(cameraMagnitude < maxCameraSpeed) {
+				var percentage = cameraMagnitude / maxCameraSpeed;
+				displaySpeed = percentage * percentage * maxDisplaySpeed;
+			}
+
+			var speedMultiplier = (cameraMagnitude <= 10e-6)? 0: displaySpeed / cameraMagnitude;
+			var displayOffset = {
+				x: cameraOffset.x * speedMultiplier,
+				y: cameraOffset.y * speedMultiplier,
+				z: cameraOffset.z * speedMultiplier
+			};
+
+			particleSystem.options.speed = displayOffset;
+
+			var newPosition = particleSystem.options.position;
+			newPosition.x += particleSystem.options.speed.x;
+			newPosition.y += particleSystem.options.speed.y;
+			newPosition.z += particleSystem.options.speed.z;
+			particleSystem.options.position = newPosition;
+		}
 
 		if ( delta > 0 ) {
 
-			for ( var x = 0; x < spawnerOptions.spawnRate * delta; x++ ) {
+			for ( var x = 0; x < particleSystem.spawnerOptions.spawnRate * delta; x++ ) {
 
 				particleSystem.spawnParticle( particleSystem.options );
 
@@ -151,10 +215,6 @@ function load() {
 		}
 
 		particleSystem.update( tick );
-
-		render();
-
-		stats.update();
 
 	}
 
@@ -232,8 +292,8 @@ function load() {
 					coord[3] *= drawHeight / detector.canvas.height;
 					
 					// Rescale coordinates from detector to three.js drawing coordinate space:
-					var displayDrawWidth = drawWidth * 2;
-					var displayDrawHeight = drawHeight * 2;
+					var displayDrawWidth = drawWidth / 2;
+					var displayDrawHeight = drawHeight / 2;
 					var minX = -displayDrawWidth / 2;
 					var maxX = displayDrawWidth / 2;
 					var minY = -displayDrawHeight / 2;
@@ -283,14 +343,15 @@ function load() {
 
 	function drawInRect(coords) {
 		var center = {
-			x: (coords[0] + coords[2]) / 2,
-			y: (coords[1] + coords[3]) / 2
+			x: -(coords[0] + coords[2]) / 2,
+			y: -(coords[1] + coords[3]) / 2,
+			z: 0
 		};
 
 		var draw = coords.length >= 4;
 		var isControlling = (controllingParticleSystem != null);
 		var state = (isControlling? 1: 0) * 2 + (draw? 1: 0);
-		console.log("State: " + state + "; center: [" + center.x + "," + center.y + "]");
+		console.log("State: " + state + "; center: [" + center.x + "," + center.y + "]; System size: " + particleSystems.length);
 
 		// ASCII State Diagram
 		//
@@ -306,21 +367,17 @@ function load() {
 			break;
 		case 1: // √ draw, x control -- first appearance of fist
 			var newParticleSystem = createParticleSystem();
-			newParticleSystem.options.previousPosition = center;
 			newParticleSystem.options.position = center;
+			newParticleSystem.options.targetPosition = center;
 			controllingParticleSystem = newParticleSystem;
 			break;
 		case 2: // x draw, √ control
-			controllingParticleSystem.options.speed = getDistance(
-				controllingParticleSystem.options.previousPosition,
-				controllingParticleSystem.options.position
-			);
+			controllingParticleSystem.targetPosition = null;
 			particleSystems.push(controllingParticleSystem);
 			controllingParticleSystem = null;
 			break;
 		case 3: // √ draw, √ control
-			controllingParticleSystem.options.previousPosition = controllingParticleSystem.options.position;
-			controllingParticleSystem.options.position = center;
+			controllingParticleSystem.options.targetPosition = center;
 			break;
 		default:
 			console.log("There is an error in your code! Life sucks.");
@@ -337,6 +394,39 @@ function clone(obj) {
     return copy;
 }
 
-function getDistance(pt1, pt2) {
-	return Math.sqrt(Math.pow(pt1.x - pt2.x, 2.0) + Math.pow(pt1.y - pt2.y, 2.0));
+function getVector(pt1, pt2) {
+	return {x: pt2.x - pt1.x, y: pt2.y - pt1.y, z: 0};
+}
+
+function getMagnitude(v) {
+	return Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+}
+
+function hslToHex(h, s, l) {
+    var r, g, b;
+
+    if(s == 0){
+        r = g = b = l; // achromatic
+    }else{
+        var hue2rgb = function hue2rgb(p, q, t){
+            if(t < 0) t += 1;
+            if(t > 1) t -= 1;
+            if(t < 1/6) return p + (q - p) * 6 * t;
+            if(t < 1/2) return q;
+            if(t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+            return p;
+        }
+
+        var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        var p = 2 * l - q;
+        r = hue2rgb(p, q, h + 1/3);
+        g = hue2rgb(p, q, h);
+        b = hue2rgb(p, q, h - 1/3);
+    }
+
+    r = Math.round(r * 255);
+    g = Math.round(g * 255);
+    b = Math.round(b * 255);
+
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
 }

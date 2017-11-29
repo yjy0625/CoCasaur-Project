@@ -33,10 +33,11 @@ a {
 	background-attachment: fixed;
 	background-size:  cover;
 	background-color: #999;
+	z-index: -100;
 }
 
 #container {
-	opacity: 0.5;
+/*	opacity: 0.5;*/
 }
 
 #video {
