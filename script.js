@@ -1,6 +1,16 @@
-var PRINT_CAM = false;
+var Globals = {
+	ShowTitle: true,
+	ShowCamera: false,
+	UseCamera: true,
+	ColorIsRandom: true,
+	ParticleColor: [255, 255, 255]
+};
+
 var SHOW_GUI = false;
 var SHOW_STATS = false;
+var IS_DRAWING = false;
+
+var mousePosition = [window.innerWidth / 2, window.innerHeight / 2];
 
 function load() {
 	var camera, tick = 0,
@@ -9,9 +19,8 @@ function load() {
 		options, spawnerOptions;
 
 	var gui = null;
-	if(SHOW_GUI) {
-		gui = new dat.GUI( { width: 350 } );
-	}
+	gui = new dat.GUI( { width: 350 } );
+	document.getElementsByClassName("ac")[0].style.visibility = "hidden";
 
 	var particleSystems = [];
 	var controllingParticleSystem = null;
@@ -57,18 +66,27 @@ function load() {
 
 		//
 
-		if(SHOW_GUI) {
-			gui.add( options, "velocityRandomness", 0, 3 );
-			gui.add( options, "positionRandomness", 0, 3 );
-			gui.add( options, "size", 1, 20 );
-			gui.add( options, "sizeRandomness", 0, 25 );
-			gui.add( options, "colorRandomness", 0, 1 );
-			gui.add( options, "lifetime", .1, 10 );
-			gui.add( options, "turbulence", 0, 1 );
+		var globalFolder = gui.addFolder('Global Settings');
+		globalFolder.add(Globals, 'ShowTitle').listen();
+		globalFolder.add(Globals, 'ShowCamera').listen();
+		globalFolder.add(Globals, 'UseCamera').listen();
 
-			gui.add( spawnerOptions, "spawnRate", 10, 30000 );
-			gui.add( spawnerOptions, "timeScale", -1, 1 );
-		}
+		var optionsFolder = gui.addFolder('Particle Appearance Options');
+		optionsFolder.add( options, "velocityRandomness", 0, 3 );
+		optionsFolder.add( options, "positionRandomness", 0, 3 );
+		optionsFolder.add( options, "size", 1, 20 );
+		optionsFolder.add( options, "sizeRandomness", 0, 25 );
+		optionsFolder.add( options, "colorRandomness", 0, 1 );
+		optionsFolder.add( options, "lifetime", .1, 10 );
+		optionsFolder.add( options, "turbulence", 0, 1 );
+
+		var spawnerOptionsFolder = gui.addFolder('Particle Generation Options');
+		spawnerOptionsFolder.add( spawnerOptions, "spawnRate", 10, 20000 );
+		spawnerOptionsFolder.add( spawnerOptions, "timeScale", 0.1, 1 );
+
+		var colorOptionsFolder = gui.addFolder('Particle Color Options');
+		colorOptionsFolder.add( Globals, "ColorIsRandom" );
+		colorOptionsFolder.addColor( Globals, "ParticleColor" );
 
 		//
 
@@ -93,10 +111,12 @@ function load() {
 		controls.dynamicDampingFactor = 0.3;
 
 		window.addEventListener( 'resize', onWindowResize, false );
+		window.addEventListener( 'mousemove', onMouseMove, false );
+		window.addEventListener( 'keydown', onKeyDown, false );
+		window.addEventListener( 'keyup', onKeyUp, false );
 
-		if(!PRINT_CAM) {
-			document.getElementById("video").style.display = "none";
-		}
+		//
+
 	}
 
 	function onWindowResize() {
@@ -108,9 +128,62 @@ function load() {
 
 	}
 
+	function onMouseMove(e) {
+
+		mousePosition = [e.pageX, e.pageY];
+
+	}
+
+	function onKeyDown(e) {
+
+		var key = e.key;
+
+		if(key == 'd') {
+			IS_DRAWING = true;
+		}
+
+	}
+
+	function onKeyUp(e) {
+
+		var key = e.key;
+
+		if(key == 'c') {
+			Globals.ShowCamera = !Globals.ShowCamera;
+		}
+		else if(key == 'g') {
+			SHOW_GUI = !SHOW_GUI;
+			if(SHOW_GUI) {
+				document.getElementsByClassName("ac")[0].style.visibility = "visible";
+			}
+			else {
+				document.getElementsByClassName("ac")[0].style.visibility = "hidden";
+			}
+		}
+		else if(key == 'u') {
+			Globals.UseCamera = !Globals.UseCamera;
+		}
+		else if(key == 't') {
+			Global.ShowTitle = !Globals.ShowTitle;
+		}
+		else if(key = 'd') {
+			IS_DRAWING = false;
+		}
+
+	}
+
 	function animate() {
 
 		window.requestAnimationFrame(animate);
+
+		if(Globals.ShowTitle) {
+			document.getElementById("title").style.visibility = "visible";
+			document.getElementById("subtitle").style.visibility = "visible";
+		}
+		else {
+			document.getElementById("title").style.visibility = "hidden";
+			document.getElementById("subtitle").style.visibility = "hidden";
+		}
 
 		for(var i = 0; i < particleSystems.length; i++) {
 			var ps = particleSystems[i];
@@ -119,7 +192,7 @@ function load() {
 			updateParticleSystem(ps);
 
 			// delete the particle system if its lifetime ends
-			if(ps.spawnerOptions.spawnRate < -270000) {
+			if(ps.spawnerOptions.spawnRate < -270000 / ps.spawnerOptions.timeScale) {
 				scene.remove(ps);
 				particleSystems.splice(i, 1);
 				i--;
@@ -150,7 +223,13 @@ function load() {
 		particleSystem.options.speed = {x: 0.0, y: 0.0, z: 0.0};
 		particleSystem.options.tick = 0;
 		particleSystem.options.clock = new THREE.Clock();
-		particleSystem.options.color = hslToHex(Math.random(), 1, 0.5);
+
+		if(Globals.ColorIsRandom) {
+			particleSystem.options.color = hslToHex(Math.random(), 1, 0.5);
+		}
+		else {
+			particleSystem.options.color = rgbToHex(Globals.ParticleColor);
+		}
 
 		particleSystem.spawnerOptions = clone(spawnerOptions);
 
@@ -180,7 +259,7 @@ function load() {
 			var cameraMagnitude = getMagnitude(cameraOffset);
 
 			const maxCameraSpeed = 20.0;
-			const maxDisplaySpeed = 1.0;
+			const maxDisplaySpeed = 1.0 * (Globals.UseCamera? 1.0: 5.0);
 
 			var displaySpeed = maxDisplaySpeed;
 			if(cameraMagnitude < maxCameraSpeed) {
@@ -253,7 +332,23 @@ function load() {
 		function play() {
 			compatibility.requestAnimationFrame(play);
 			if (video.paused) video.play();
-	        
+
+			if(Globals.UseCamera) {
+				performCamDetection();
+			}
+			else {
+				performMouseDetection();
+			}
+		}
+
+		function performCamDetection() {
+			if(Globals.ShowCamera) {
+				document.getElementById("video").style.visibility = "visible";
+			}
+			else {
+				document.getElementById("video").style.visibility = "hidden";
+			}
+
 	        // Draw video overlay:
 			canvas.width = ~~(100 * video.videoWidth / video.videoHeight);
 			canvas.height = 100;
@@ -274,29 +369,11 @@ function load() {
 				if (coords[0]) {
 					// [startx, starty, width, height]
 					var coord = coords[0].slice(0);
-					// [startx, starty, endx, endy]
-					var displayCoord = coord.slice(0);
-					
-					// Rescale coordinates from detector to video coordinate space:
-					var drawWidth = canvas.width;
-					var drawHeight = canvas.height;
-					coord[0] *= drawWidth / detector.canvas.width;
-					coord[1] *= drawHeight / detector.canvas.height;
-					coord[2] *= drawWidth / detector.canvas.width;
-					coord[3] *= drawHeight / detector.canvas.height;
-					
-					// Rescale coordinates from detector to three.js drawing coordinate space:
-					var displayDrawWidth = drawWidth / 2;
-					var displayDrawHeight = drawHeight / 2;
-					var minX = -displayDrawWidth / 2;
-					var maxX = displayDrawWidth / 2;
-					var minY = -displayDrawHeight / 2;
-					var maxY = displayDrawHeight / 2;
 
-					displayCoord[0] = Math.floor(coord[0] * displayDrawWidth / drawWidth - displayDrawWidth / 2);
-					displayCoord[1] = Math.floor(coord[1] * displayDrawHeight / drawHeight - displayDrawHeight / 2);
-					displayCoord[2] = Math.ceil((coord[0] + coord[2]) * displayDrawWidth / drawWidth - displayDrawWidth / 2);
-					displayCoord[3] = Math.ceil((coord[1] + coord[3]) * displayDrawHeight / drawHeight - displayDrawHeight / 2);
+					var dataSourceWidth = detector.canvas.width;
+					var dataSourceHeight = detector.canvas.height;
+
+					var displayCoord = translateCoordinates(coord, dataSourceWidth, dataSourceHeight);
 
 					// draw on three.js if recognition is stable
 					if (fist_pos_old) {
@@ -318,7 +395,7 @@ function load() {
 					}
 				
 					// Draw coordinates on video overlay:
-					if(PRINT_CAM) {
+					if(Globals.ShowCamera) {
 						context.beginPath();
 						context.lineWidth = '2';
 						context.fillStyle = fist_pos_old ? 'rgba(0, 255, 255, 0.5)' : 'rgba(255, 0, 0, 0.5)';
@@ -327,6 +404,49 @@ function load() {
 					}
 				} else fist_pos_old = null;
 			}
+		}
+
+		function performMouseDetection() {
+
+			var coord = [window.innerWidth - mousePosition[0], mousePosition[1], 0, 0];
+
+			document.getElementById("video").style.visibility = "hidden";
+
+			// Rescale coordinates from mouse coordinate space to video coordinate space:
+			var dataSourceWidth = window.innerWidth;
+			var dataSourceHeight = window.innerHeight;
+			
+			var displayCoord = translateCoordinates(coord, dataSourceWidth, dataSourceHeight, 0.5);
+
+			if(IS_DRAWING) {
+				drawInRect(displayCoord);
+			}
+			else {
+				drawInRect([]);
+			}
+
+		}
+
+		function translateCoordinates(coord, dataSourceWidth, dataSourceHeight, multiplier = 1.0) {
+
+			// [startx, starty, endx, endy]
+			var displayCoord = coord.slice(0);
+			
+			// Rescale coordinates from detector to three.js drawing coordinate space:
+			var displayWidth = canvas.width;
+			var displayHeight = canvas.height;
+			var minX = -displayWidth / 2;
+			var maxX = displayWidth / 2;
+			var minY = -displayHeight / 2;
+			var maxY = displayHeight / 2;
+
+			displayCoord[0] = Math.floor(coord[0] * displayWidth / dataSourceWidth - displayWidth / 2) * multiplier;
+			displayCoord[1] = Math.floor(coord[1] * displayHeight / dataSourceHeight - displayHeight / 2)* multiplier;
+			displayCoord[2] = Math.ceil((coord[0] + coord[2]) * displayWidth / dataSourceWidth - displayWidth / 2)* multiplier;
+			displayCoord[3] = Math.ceil((coord[1] + coord[3]) * displayHeight / dataSourceHeight - displayHeight / 2)* multiplier;
+
+			return displayCoord;
+
 		}
 
 	}
@@ -417,6 +537,14 @@ function hslToHex(h, s, l) {
     r = Math.round(r * 255);
     g = Math.round(g * 255);
     b = Math.round(b * 255);
+
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+}
+
+function rgbToHex(rgb) {
+	var r = rgb[0];
+    var g = rgb[1];
+    var b = rgb[2];
 
     return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
 }
