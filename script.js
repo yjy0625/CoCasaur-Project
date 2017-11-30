@@ -1,7 +1,7 @@
 var Globals = {
 	ShowTitle: true,
 	ShowCamera: false,
-	UseCamera: true,
+	UseCamera: false,
 	ColorIsRandom: true,
 	ParticleColor: [255, 255, 255]
 };
